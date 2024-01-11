@@ -36,10 +36,6 @@ def panoptic_predictor(image):
   dset_meta = MetadataCatalog.get("coco_2017_train")
   dset_meta_stuffs = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
 
-  # dataset_dicts = load_coco_json("annotations/instances_train2017.json", "train2017")
-  # stuff_classes = dataset_dicts["stuff_classes"]
-  # print("Stuff classes:", stuff_classes)
-
   for info in segments_info:
       print(info)
       if info["isthing"] == True:
