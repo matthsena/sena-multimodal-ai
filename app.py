@@ -16,6 +16,7 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
+from detectron2.data.datasets import load_coco_json
 
 def pil_to_cv2(image):
   opencv_image = np.array(image)
@@ -33,11 +34,20 @@ def panoptic_predictor(image):
   out = v.draw_panoptic_seg_predictions(panoptic_seg.to("cpu"), segments_info)
 
   dset_meta = MetadataCatalog.get("coco_2017_train")
+  dset_meta_stuffs = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
+
+  # dataset_dicts = load_coco_json("annotations/instances_train2017.json", "train2017")
+  # stuff_classes = dataset_dicts["stuff_classes"]
+  # print("Stuff classes:", stuff_classes)
+
   for info in segments_info:
       print(info)
       if info["isthing"] == True:
           cat = dset_meta.thing_classes[info['category_id']]
           print(cat, info['score'])
+      else:
+          cat = dset_meta_stuffs.stuff_classes[info['category_id']]
+          print(cat)
 
   return pil_to_cv2(out.get_image()[:, :, ::-1])
 
