@@ -1,3 +1,9 @@
+# LLAMA
+from llama2_custom import prompt_creator, llama2
+
+# OCR
+from easyocr_custom import predict as ocr_predictor
+
 import sys, os
 
 sys.path.insert(0, os.path.abspath('./detectron2'))
@@ -5,10 +11,7 @@ sys.path.insert(0, os.path.abspath('./detectron2'))
 import gradio as gr
 import numpy as np
 import cv2
-from PIL import Image, ImageDraw
 
-# OCR
-import easyocr
 
 # DETECTRON 2
 from detectron2 import model_zoo
@@ -16,7 +19,6 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
-from detectron2.data.datasets import load_coco_json
 
 def pil_to_cv2(image):
   opencv_image = np.array(image)
@@ -36,15 +38,23 @@ def panoptic_predictor(image):
   dset_meta = MetadataCatalog.get("coco_2017_train")
   dset_meta_stuffs = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
 
+  extracted_features = []
+
   for info in segments_info:
       print(info)
       if info["isthing"] == True:
           cat = dset_meta.thing_classes[info['category_id']]
           print(cat, info['score'])
+          extracted_features.append(cat)
       else:
           cat = dset_meta_stuffs.stuff_classes[info['category_id']]
           print(cat)
+          extracted_features.append(cat)
 
+#   output = f'Panoptic Output: {",".join(extracted_features)}'
+#   prompt = prompt_creator(output)
+#   llama2(prompt)
+  
   return pil_to_cv2(out.get_image()[:, :, ::-1])
 
 def keypoint_predictor(image):
@@ -58,29 +68,15 @@ def keypoint_predictor(image):
   out = v.draw_instance_predictions(keypoint_seg["instances"].to("cpu"))
   return pil_to_cv2(out.get_image()[:, :, ::-1])
 
-# OCR
-def ocr_predictor(image):
-    reader = easyocr.Reader(['en', 'pt', 'es', 'fr', 'de', 'it'], gpu=False)
-    result = reader.readtext(image)
-
-    for (bbox, text, prob) in result:
-        (tl, tr, br, bl) = bbox
-        tl = (int(tl[0]), int(tl[1]))
-        br = (int(br[0]), int(br[1]))
-        cv2.rectangle(image, tl, br, (0, 255, 0), 2)
-        cv2.putText(image, text, (tl[0], tl[1] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-        print("text: ", text, "\nprob: ", prob)
-    return pil_to_cv2(image)
 
 
 def image_process(image):
   image = pil_to_cv2(image)
   panoptic = panoptic_predictor(image)
   keypoint = keypoint_predictor(image)
-  ocr = ocr_predictor(image)
+  ocr_image, valuesAndProbsOCR = ocr_predictor(image)
 
-  return panoptic, keypoint, ocr
+  return panoptic, keypoint, pil_to_cv2(ocr_image)
 
 
 demo = gr.Interface(
