@@ -30,16 +30,22 @@ def image_process(image, use_inception, use_resnet50, use_panoptic, use_keypoint
     if use_inception:
         try:
             inception_preds = inception3_predictor(image)
-            print(f"Inception: {inception_preds}")
+            inception_predictions = list(map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", inception_preds))
+            inception_markdown = f"# Inception v3\n### Top 5 Predições:\n{''.join(inception_predictions)}"
+            results.append(inception_markdown)
         except Exception as e:
-            print(f"Error in Inception3: {e}")
+            print(f"Error in Inception v3: {e}")
+            results.append("Error in Inception3")
 
     if use_resnet50:
         try:
             resnet50_preds = resnet50_predictor(image)
-            print(f"Resnet50: {resnet50_preds}")
+            resnet50_predictions = list(map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", resnet50_preds))
+            resnet50_markdown = f"# ResNet-50\n### Top 5 Predições:\n{''.join(resnet50_predictions)}"
+            results.append(resnet50_markdown)
         except Exception as e:
             print(f"Error in Resnet50: {e}")
+            results.append("Error in Resnet50")
 
     image_cv2 = pil_to_cv2(image)
 
@@ -47,10 +53,12 @@ def image_process(image, use_inception, use_resnet50, use_panoptic, use_keypoint
         try:
             panoptic, extracted_classes = panoptic_predictor(image_cv2)
             results.append(pil_to_cv2(panoptic))
-            print(f"Extracted Classes: {extracted_classes}")
+            panoptic_predicitions = list(map(lambda x: f"<b>{x}</b><br/>", extracted_classes))
+            results.append(f"# Panoptic Predictor\n### Classes extraídas:\n{''.join(panoptic_predicitions)}")
         except Exception as e:
             print(f"Error in Panoptic: {e}")
             results.append(fallback_image)
+            results.append("Error in Panoptic")
     else: 
         results.append(None)
 
@@ -68,10 +76,12 @@ def image_process(image, use_inception, use_resnet50, use_panoptic, use_keypoint
         try:
             ocr_image, valuesAndProbsOCR = ocr_predictor(image_cv2)
             results.append(pil_to_cv2(ocr_image))
-            print(f"OCR: {valuesAndProbsOCR}")
+            ocr_predictions = list(map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", valuesAndProbsOCR))
+            results.append(f"# OCR\n### Textos extraídos:\n{''.join(ocr_predictions)}")
         except Exception as e:
             print(f"Error in OCR: {e}")
             results.append(fallback_image)
+            results.append("Error in OCR")
     else:
         results.append(None)
 
@@ -89,9 +99,13 @@ demo = gr.Interface(
         gr.Checkbox(label="Use OCR", value=True)
     ],
     outputs=[
+        gr.Markdown(),
+        gr.Markdown(),
         gr.Image(label="PANOPTIC_PREDICTOR"),
+        gr.Markdown(),
         gr.Image(label="KEYPOINT_PREDICTOR"),
         gr.Image(label="OCR"),
+        gr.Markdown(),
     ],
     # flagging_options=["blurry", "incorrect", "other"],
     examples=[
