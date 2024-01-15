@@ -14,6 +14,8 @@ import gradio as gr
 import numpy as np
 import cv2
 
+from threading import Thread
+
 
 def pil_to_cv2(image):
     opencv_image = np.array(image)
@@ -21,27 +23,52 @@ def pil_to_cv2(image):
     return opencv_image
 
 
-def image_process(image):
-    inception_preds = inception3_predictor(image)
-    resnet50_preds = resnet50_predictor(image)
+def image_process(image, use_inception, use_resnet50, use_panoptic, use_keypoint, use_ocr):
+    results = []
 
-    image = pil_to_cv2(image)
-    panoptic, extracted_classes = panoptic_predictor(image)
-    keypoint = keypoint_predictor(image)
-    ocr_image, valuesAndProbsOCR = ocr_predictor(image)
+    if use_inception:
+        inception_preds = inception3_predictor(image)
+        print(f"Inception: {inception_preds}")
 
+    if use_resnet50:
+        resnet50_preds = resnet50_predictor(image)
+        print(f"Resnet50: {resnet50_preds}")
 
-    print(f"Extracted Classes: {extracted_classes}")
-    print(f"OCR: {valuesAndProbsOCR}")
-    print(f"Inception: {inception_preds}")
-    print(f"Resnet50: {resnet50_preds}")
+    image_cv2 = pil_to_cv2(image)
 
-    return pil_to_cv2(panoptic), pil_to_cv2(keypoint), pil_to_cv2(ocr_image)
+    if use_panoptic:
+        panoptic, extracted_classes = panoptic_predictor(image_cv2)
+        results.append(pil_to_cv2(panoptic))
+        print(f"Extracted Classes: {extracted_classes}")
+    else: 
+        results.append(None)
+
+    if use_keypoint:
+        keypoint = keypoint_predictor(image_cv2)
+        results.append(pil_to_cv2(keypoint))
+    else:
+        results.append(None)
+
+    if use_ocr:
+        ocr_image, valuesAndProbsOCR = ocr_predictor(image_cv2)
+        results.append(pil_to_cv2(ocr_image))
+        print(f"OCR: {valuesAndProbsOCR}")
+    else:
+        results.append(None)
+        
+    return results
 
 
 demo = gr.Interface(
     image_process,
-    gr.Image(type="pil"),
+    inputs=[
+        gr.Image(type="pil"),
+        gr.Checkbox(label="Use Inception3", value=True),
+        gr.Checkbox(label="Use ResNet50", value=True),
+        gr.Checkbox(label="Use Panoptic Predictor", value=True),
+        gr.Checkbox(label="Use Keypoint Predictor", value=True),
+        gr.Checkbox(label="Use OCR", value=True)
+    ],
     outputs=[
         gr.Image(label="PANOPTIC_PREDICTOR"),
         gr.Image(label="KEYPOINT_PREDICTOR"),
@@ -49,9 +76,9 @@ demo = gr.Interface(
     ],
     # flagging_options=["blurry", "incorrect", "other"],
     examples=[
-        os.path.join(os.path.dirname(__file__), "images/game1.jpg"),
-        os.path.join(os.path.dirname(__file__), "images/placabrasil.jpg"),
-        os.path.join(os.path.dirname(__file__), "images/usp.jpg")
+        [os.path.join(os.path.dirname(__file__), "images/game1.jpg"), True, True, True, True, True],
+        [os.path.join(os.path.dirname(__file__), "images/placabrasil.jpg"), True, True, True, True, True],
+        [os.path.join(os.path.dirname(__file__), "images/usp.jpg"), True, True, True, True, True]
     ],
 )
 
