@@ -5,6 +5,8 @@ from llama2_custom import prompt_creator, llama2
 from easyocr_custom import predict as ocr_predictor
 # DETECTRON 2
 from detectron2_custom import panoptic_predictor, keypoint_predictor
+# Inception3
+from inception3_custom import predict as inception3_predictor
 
 import gradio as gr
 import numpy as np
@@ -18,13 +20,17 @@ def pil_to_cv2(image):
 
 
 def image_process(image):
+    inception_preds = inception3_predictor(image)
+    
     image = pil_to_cv2(image)
-    panoptic, extracted_classes  = panoptic_predictor(image)
+    panoptic, extracted_classes = panoptic_predictor(image)
     keypoint = keypoint_predictor(image)
     ocr_image, valuesAndProbsOCR = ocr_predictor(image)
 
+
     print(f"Extracted Classes: {extracted_classes}")
     print(f"OCR: {valuesAndProbsOCR}")
+    print(f"Inception: {inception_preds}")
 
     return pil_to_cv2(panoptic), pil_to_cv2(keypoint), pil_to_cv2(ocr_image)
 
