@@ -4,7 +4,7 @@ from PIL import Image
 import torch
 
 
-model = models.resnet50(pretrained=True)
+model = models.resnet50(weights='ResNet50_Weights.IMAGENET1K_V1')
 model.eval()
 
 

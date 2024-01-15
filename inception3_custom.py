@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torchvision import models, transforms
 from PIL import Image
 
-model = models.inception_v3(pretrained=True)
+model = models.inception_v3(weights='Inception_V3_Weights.DEFAULT')
 model.eval()
 
 

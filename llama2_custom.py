@@ -47,7 +47,11 @@ def llama2(prompt):
             max_length=400,
         )
 
-        for seq in sequences:
-            print(f"{seq['generated_text']}")
+        printable_sequences = []
 
-        return sequences
+        for seq in sequences:
+            printable_sequences.append(seq['generated_text'])
+            print(f"{seq['generated_text']}")
+        
+    
+        return ' '.join(printable_sequences)

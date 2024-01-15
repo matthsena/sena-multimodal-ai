@@ -34,11 +34,9 @@ def panoptic_predictor(image):
     for info in segments_info:
       if info["isthing"] == True:
         cat = dset_meta.thing_classes[info['category_id']]
-        print(cat, info['score'])
         extracted_classes.append(cat)
       else:
         cat = dset_meta_stuffs.stuff_classes[info['category_id']]
-        print(cat)
         extracted_classes.append(cat)
     return out.get_image()[:, :, ::-1], extracted_classes
   except Exception as e:

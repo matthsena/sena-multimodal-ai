@@ -14,8 +14,6 @@ import gradio as gr
 import numpy as np
 import cv2
 
-from threading import Thread
-
 
 def pil_to_cv2(image):
     opencv_image = np.array(image)
@@ -23,29 +21,35 @@ def pil_to_cv2(image):
     return opencv_image
 
 
-def image_process(image, use_inception, use_resnet50, use_panoptic, use_keypoint, use_ocr):
+def image_process(image, use_llama, use_inception, use_resnet50, use_panoptic, use_keypoint, use_ocr):
     results = []
     fallback_image = cv2.imread('./images/fallback.png')
-
+    
     if use_inception:
         try:
             inception_preds = inception3_predictor(image)
-            inception_predictions = list(map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", inception_preds))
+            inception_predictions = list(
+                map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", inception_preds))
             inception_markdown = f"# Inception v3\n### Top 5 Predições:\n{''.join(inception_predictions)}"
             results.append(inception_markdown)
         except Exception as e:
             print(f"Error in Inception v3: {e}")
             results.append("Error in Inception3")
+    else:
+        results.append(None)
 
     if use_resnet50:
         try:
             resnet50_preds = resnet50_predictor(image)
-            resnet50_predictions = list(map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", resnet50_preds))
+            resnet50_predictions = list(
+                map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", resnet50_preds))
             resnet50_markdown = f"# ResNet-50\n### Top 5 Predições:\n{''.join(resnet50_predictions)}"
             results.append(resnet50_markdown)
         except Exception as e:
             print(f"Error in Resnet50: {e}")
             results.append("Error in Resnet50")
+    else:
+        results.append(None)
 
     image_cv2 = pil_to_cv2(image)
 
@@ -53,13 +57,16 @@ def image_process(image, use_inception, use_resnet50, use_panoptic, use_keypoint
         try:
             panoptic, extracted_classes = panoptic_predictor(image_cv2)
             results.append(pil_to_cv2(panoptic))
-            panoptic_predicitions = list(map(lambda x: f"<b>{x}</b><br/>", extracted_classes))
-            results.append(f"# Panoptic Predictor\n### Classes extraídas:\n{''.join(panoptic_predicitions)}")
+            panoptic_predicitions = list(
+                map(lambda x: f"<b>{x}</b><br/>", extracted_classes))
+            results.append(
+                f"# Panoptic Predictor\n### Classes extraídas:\n{''.join(panoptic_predicitions)}")
         except Exception as e:
             print(f"Error in Panoptic: {e}")
             results.append(fallback_image)
             results.append("Error in Panoptic")
-    else: 
+    else:
+        results.append(None)
         results.append(None)
 
     if use_keypoint:
@@ -76,12 +83,27 @@ def image_process(image, use_inception, use_resnet50, use_panoptic, use_keypoint
         try:
             ocr_image, valuesAndProbsOCR = ocr_predictor(image_cv2)
             results.append(pil_to_cv2(ocr_image))
-            ocr_predictions = list(map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", valuesAndProbsOCR))
-            results.append(f"# OCR\n### Textos extraídos:\n{''.join(ocr_predictions)}")
+            ocr_predictions = list(
+                map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", valuesAndProbsOCR))
+            results.append(
+                f"# OCR\n### Textos extraídos:\n{''.join(ocr_predictions)}")
         except Exception as e:
             print(f"Error in OCR: {e}")
             results.append(fallback_image)
             results.append("Error in OCR")
+    else:
+        results.append(None)
+        results.append(None)
+
+    if use_llama:
+        try:
+            llama_prompt = prompt_creator('two guys playing football')
+            llama_preds = llama2(llama_prompt)
+            results.append(llama_preds)
+
+        except Exception as e:
+            print(f"Error in LLaMA 2: {e}")
+            results.append("Error in LLaMA 2")
     else:
         results.append(None)
 
@@ -92,26 +114,31 @@ demo = gr.Interface(
     image_process,
     inputs=[
         gr.Image(type="pil"),
-        gr.Checkbox(label="Use Inception3", value=True),
-        gr.Checkbox(label="Use ResNet50", value=True),
-        gr.Checkbox(label="Use Panoptic Predictor", value=True),
-        gr.Checkbox(label="Use Keypoint Predictor", value=True),
-        gr.Checkbox(label="Use OCR", value=True)
+        gr.Checkbox(label="LLaMA 2", value=False),
+        gr.Checkbox(label="Inception v3", value=True),
+        gr.Checkbox(label="ResNet50", value=True),
+        gr.Checkbox(label="Panoptic Predictor", value=True),
+        gr.Checkbox(label="Keypoint Predictor", value=True),
+        gr.Checkbox(label="OCR", value=True)
     ],
     outputs=[
         gr.Markdown(),
         gr.Markdown(),
-        gr.Image(label="PANOPTIC_PREDICTOR"),
+        gr.Image(label="Panoptic Predictor"),
         gr.Markdown(),
-        gr.Image(label="KEYPOINT_PREDICTOR"),
+        gr.Image(label="Keypoint Predictor"),
         gr.Image(label="OCR"),
         gr.Markdown(),
+        gr.Textbox(lines=5, label="LLaMA 2 Output")
     ],
     # flagging_options=["blurry", "incorrect", "other"],
     examples=[
-        [os.path.join(os.path.dirname(__file__), "images/game1.jpg"), True, True, True, True, True],
-        [os.path.join(os.path.dirname(__file__), "images/placabrasil.jpg"), True, True, True, True, True],
-        [os.path.join(os.path.dirname(__file__), "images/usp.jpg"), True, True, True, True, True]
+        [os.path.join(os.path.dirname(__file__), "images/game1.jpg"),
+         False, True, True, True, True, True],
+        [os.path.join(os.path.dirname(__file__),
+                      "images/placabrasil.jpg"), False, True, True, True, True, True],
+        [os.path.join(os.path.dirname(__file__), "images/usp.jpg"),
+         False, True, True, True, True, True]
     ],
 )
 
