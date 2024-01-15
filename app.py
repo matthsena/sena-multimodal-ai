@@ -7,6 +7,8 @@ from easyocr_custom import predict as ocr_predictor
 from detectron2_custom import panoptic_predictor, keypoint_predictor
 # Inception3
 from inception3_custom import predict as inception3_predictor
+# Resnet50
+from resnet50_custom import predict as resnet50_predictor
 
 import gradio as gr
 import numpy as np
@@ -21,7 +23,8 @@ def pil_to_cv2(image):
 
 def image_process(image):
     inception_preds = inception3_predictor(image)
-    
+    resnet50_preds = resnet50_predictor(image)
+
     image = pil_to_cv2(image)
     panoptic, extracted_classes = panoptic_predictor(image)
     keypoint = keypoint_predictor(image)
@@ -31,6 +34,7 @@ def image_process(image):
     print(f"Extracted Classes: {extracted_classes}")
     print(f"OCR: {valuesAndProbsOCR}")
     print(f"Inception: {inception_preds}")
+    print(f"Resnet50: {resnet50_preds}")
 
     return pil_to_cv2(panoptic), pil_to_cv2(keypoint), pil_to_cv2(ocr_image)
 
