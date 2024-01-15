@@ -25,37 +25,56 @@ def pil_to_cv2(image):
 
 def image_process(image, use_inception, use_resnet50, use_panoptic, use_keypoint, use_ocr):
     results = []
+    fallback_image = cv2.imread('./images/fallback.png')
 
     if use_inception:
-        inception_preds = inception3_predictor(image)
-        print(f"Inception: {inception_preds}")
+        try:
+            inception_preds = inception3_predictor(image)
+            print(f"Inception: {inception_preds}")
+        except Exception as e:
+            print(f"Error in Inception3: {e}")
 
     if use_resnet50:
-        resnet50_preds = resnet50_predictor(image)
-        print(f"Resnet50: {resnet50_preds}")
+        try:
+            resnet50_preds = resnet50_predictor(image)
+            print(f"Resnet50: {resnet50_preds}")
+        except Exception as e:
+            print(f"Error in Resnet50: {e}")
 
     image_cv2 = pil_to_cv2(image)
 
     if use_panoptic:
-        panoptic, extracted_classes = panoptic_predictor(image_cv2)
-        results.append(pil_to_cv2(panoptic))
-        print(f"Extracted Classes: {extracted_classes}")
+        try:
+            panoptic, extracted_classes = panoptic_predictor(image_cv2)
+            results.append(pil_to_cv2(panoptic))
+            print(f"Extracted Classes: {extracted_classes}")
+        except Exception as e:
+            print(f"Error in Panoptic: {e}")
+            results.append(fallback_image)
     else: 
         results.append(None)
 
     if use_keypoint:
-        keypoint = keypoint_predictor(image_cv2)
-        results.append(pil_to_cv2(keypoint))
+        try:
+            keypoint = keypoint_predictor(image_cv2)
+            results.append(pil_to_cv2(keypoint))
+        except Exception as e:
+            print(f"Error in Keypoint: {e}")
+            results.append(fallback_image)
     else:
         results.append(None)
 
     if use_ocr:
-        ocr_image, valuesAndProbsOCR = ocr_predictor(image_cv2)
-        results.append(pil_to_cv2(ocr_image))
-        print(f"OCR: {valuesAndProbsOCR}")
+        try:
+            ocr_image, valuesAndProbsOCR = ocr_predictor(image_cv2)
+            results.append(pil_to_cv2(ocr_image))
+            print(f"OCR: {valuesAndProbsOCR}")
+        except Exception as e:
+            print(f"Error in OCR: {e}")
+            results.append(fallback_image)
     else:
         results.append(None)
-        
+
     return results
 
 
