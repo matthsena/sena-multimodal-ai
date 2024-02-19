@@ -29,3 +29,4 @@ git+https://github.com/facebookresearch/fvcore.git
 # --use-pep517
 transformers
 accelerate
+langchain-openai

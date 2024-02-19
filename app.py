@@ -1,6 +1,4 @@
-# LLAMA
 import os
-from llama2_custom import prompt_creator, llama2
 # OCR
 from easyocr_custom import predict as ocr_predictor
 # DETECTRON 2
@@ -24,7 +22,7 @@ def pil_to_cv2(image):
 def image_process(image, use_llama, use_inception, use_resnet50, use_panoptic, use_keypoint, use_ocr):
     results = []
     fallback_image = cv2.imread('./images/fallback.png')
-    
+
     if use_inception:
         try:
             inception_preds = inception3_predictor(image)
@@ -96,14 +94,7 @@ def image_process(image, use_llama, use_inception, use_resnet50, use_panoptic, u
         results.append(None)
 
     if use_llama:
-        try:
-            llama_prompt = prompt_creator('two guys playing football')
-            llama_preds = llama2(llama_prompt)
-            results.append(llama_preds)
-
-        except Exception as e:
-            print(f"Error in LLaMA 2: {e}")
-            results.append("Error in LLaMA 2")
+        results.append(None)
     else:
         results.append(None)
 
