@@ -7,8 +7,8 @@ from detectron2_custom import panoptic_predictor, keypoint_predictor
 from inception3_custom import predict as inception3_predictor
 # Resnet50
 from resnet50_custom import predict as resnet50_predictor
-# LLM 
-from gemma_2b import format_panoptic_list, generate_text as gemma_2b_predictor, merge_and_sum_predictions
+# LLM
+from gemma_2b_single_img import discart_or_format_ocr, format_panoptic_list, generate_text as gemma_2b_predictor, merge_and_sum_predictions
 
 import gradio as gr
 import numpy as np
@@ -21,88 +21,57 @@ def pil_to_cv2(image):
     return opencv_image
 
 
-def image_process(image, use_llama, use_inception, use_resnet50, use_panoptic, use_keypoint, use_ocr):
+def image_process(image):
     results = []
     fallback_image = cv2.imread('./images/fallback.png')
 
-    if use_inception:
-        try:
-            inception_preds = inception3_predictor(image)
-            inception_predictions = list(
-                map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", inception_preds))
-            inception_markdown = f"# Inception v3\n### Top 5 Predições:\n{''.join(inception_predictions)}"
-            results.append(inception_markdown)
-        except Exception as e:
-            print(f"Error in Inception v3: {e}")
-            results.append("Error in Inception3")
-    else:
-        results.append(None)
+    try:
+        inception_preds = inception3_predictor(image)
+        inception_predictions = list(
+            map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", inception_preds))
+        inception_markdown = f"# Inception v3\n### Top 5 Predições:\n{''.join(inception_predictions)}"
+        results.append(inception_markdown)
+    except Exception as e:
+        results.append(f"Error in Inception3: {e}")
 
-    if use_resnet50:
-        try:
-            resnet50_preds = resnet50_predictor(image)
-            resnet50_predictions = list(
-                map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", resnet50_preds))
-            resnet50_markdown = f"# ResNet-50\n### Top 5 Predições:\n{''.join(resnet50_predictions)}"
-            results.append(resnet50_markdown)
-        except Exception as e:
-            print(f"Error in Resnet50: {e}")
-            results.append("Error in Resnet50")
-    else:
-        results.append(None)
-
-    merge_and_sum_predictions(inception_preds, resnet50_preds)
-
+    try:
+        resnet50_preds = resnet50_predictor(image)
+        resnet50_predictions = list(
+            map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", resnet50_preds))
+        resnet50_markdown = f"# ResNet-50\n### Top 5 Predições:\n{''.join(resnet50_predictions)}"
+        results.append(resnet50_markdown)
+    except Exception as e:
+        results.append(f"Error in Resnet50: {e}")
 
     image_cv2 = pil_to_cv2(image)
 
-    if use_panoptic:
-        try:
-            panoptic, extracted_classes = panoptic_predictor(image_cv2)
-            results.append(pil_to_cv2(panoptic))
-            format_panoptic_list(extracted_classes)
-            panoptic_predicitions = list(
-                map(lambda x: f"<b>{x}</b><br/>", extracted_classes))
-            results.append(
-                f"# Panoptic Predictor\n### Classes extraídas:\n{''.join(panoptic_predicitions)}")
-        except Exception as e:
-            print(f"Error in Panoptic: {e}")
-            results.append(fallback_image)
-            results.append("Error in Panoptic")
-    else:
-        results.append(None)
-        results.append(None)
+    try:
+        panoptic, extracted_classes = panoptic_predictor(image_cv2)
+        results.append(pil_to_cv2(panoptic))
+        panoptic_predicitions = list(
+            map(lambda x: f"<b>{x}</b><br/>", extracted_classes))
+        results.append(
+            f"# Panoptic Predictor\n### Classes extraídas:\n{''.join(panoptic_predicitions)}")
+    except Exception as e:
+        results.append(fallback_image)
+        results.append(f"Error in Panoptic: {e}")
 
-    if use_keypoint:
-        try:
-            keypoint = keypoint_predictor(image_cv2)
-            results.append(pil_to_cv2(keypoint))
-        except Exception as e:
-            print(f"Error in Keypoint: {e}")
-            results.append(fallback_image)
-    else:
-        results.append(None)
+    try:
+        ocr_image, valuesAndProbsOCR = ocr_predictor(image_cv2)
+        results.append(pil_to_cv2(ocr_image))
+        ocr_predictions = list(
+            map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", valuesAndProbsOCR))
+        results.append(
+            f"# OCR\n### Textos extraídos:\n{''.join(ocr_predictions)}")
+    except Exception as e:
+        results.append(fallback_image)
+        results.append(f"Error in OCR: {e}")
 
-    if use_ocr:
-        try:
-            ocr_image, valuesAndProbsOCR = ocr_predictor(image_cv2)
-            results.append(pil_to_cv2(ocr_image))
-            ocr_predictions = list(
-                map(lambda x: f"<b>{x[0]}</b> - {round(x[1], 2)}<br/>", valuesAndProbsOCR))
-            results.append(
-                f"# OCR\n### Textos extraídos:\n{''.join(ocr_predictions)}")
-        except Exception as e:
-            print(f"Error in OCR: {e}")
-            results.append(fallback_image)
-            results.append("Error in OCR")
-    else:
-        results.append(None)
-        results.append(None)
 
-    if use_llama:
-        results.append(gemma_2b_predictor())
-    else:
-        results.append(None)
+    text = gemma_2b_predictor(merge_and_sum_predictions(inception_preds, resnet50_preds), format_panoptic_list(
+        extracted_classes), discart_or_format_ocr(valuesAndProbsOCR))
+
+    results.append(text)
 
     return results
 
@@ -111,31 +80,22 @@ demo = gr.Interface(
     image_process,
     inputs=[
         gr.Image(type="pil"),
-        gr.Checkbox(label="LLaMA 2", value=False),
-        gr.Checkbox(label="Inception v3", value=True),
-        gr.Checkbox(label="ResNet50", value=True),
-        gr.Checkbox(label="Panoptic Predictor", value=True),
-        gr.Checkbox(label="Keypoint Predictor", value=True),
-        gr.Checkbox(label="OCR", value=True)
     ],
     outputs=[
         gr.Markdown(),
         gr.Markdown(),
         gr.Image(label="Panoptic Predictor"),
         gr.Markdown(),
-        gr.Image(label="Keypoint Predictor"),
         gr.Image(label="OCR"),
         gr.Markdown(),
         gr.Textbox(lines=5, label="LLaMA 2 Output")
     ],
     # flagging_options=["blurry", "incorrect", "other"],
     examples=[
-        [os.path.join(os.path.dirname(__file__), "images/game1.jpg"),
-         False, True, True, True, True, True],
+        [os.path.join(os.path.dirname(__file__), "images/game1.jpg")],
         [os.path.join(os.path.dirname(__file__),
-                      "images/placabrasil.jpg"), False, True, True, True, True, True],
-        [os.path.join(os.path.dirname(__file__), "images/usp.jpg"),
-         False, True, True, True, True, True]
+                      "images/placabrasil.jpg")],
+        [os.path.join(os.path.dirname(__file__), "images/usp.jpg")]
     ],
 )
 
