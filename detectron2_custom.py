@@ -39,7 +39,6 @@ def panoptic_predictor(image):
         extracted_classes.append(cat)
       else:
         cat = dset_meta_stuffs.stuff_classes[info['category_id']]
-        print(info['category_id'], cat)
         extracted_classes.append(cat)
     return out.get_image()[:, :, ::-1], extracted_classes
   except Exception as e:
