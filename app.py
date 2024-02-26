@@ -7,6 +7,8 @@ from detectron2_custom import panoptic_predictor, keypoint_predictor
 from inception3_custom import predict as inception3_predictor
 # Resnet50
 from resnet50_custom import predict as resnet50_predictor
+# LLM 
+from gemma_2b import format_panoptic_list, generate_text as gemma_2b_predictor, merge_and_sum_predictions
 
 import gradio as gr
 import numpy as np
@@ -49,12 +51,16 @@ def image_process(image, use_llama, use_inception, use_resnet50, use_panoptic, u
     else:
         results.append(None)
 
+    merge_and_sum_predictions(inception_preds, resnet50_preds)
+
+
     image_cv2 = pil_to_cv2(image)
 
     if use_panoptic:
         try:
             panoptic, extracted_classes = panoptic_predictor(image_cv2)
             results.append(pil_to_cv2(panoptic))
+            format_panoptic_list(extracted_classes)
             panoptic_predicitions = list(
                 map(lambda x: f"<b>{x}</b><br/>", extracted_classes))
             results.append(
@@ -94,7 +100,7 @@ def image_process(image, use_llama, use_inception, use_resnet50, use_panoptic, u
         results.append(None)
 
     if use_llama:
-        results.append(None)
+        results.append(gemma_2b_predictor())
     else:
         results.append(None)
 
