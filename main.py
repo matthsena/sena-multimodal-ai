@@ -1,25 +1,26 @@
+import gc
 import os
 import sys
 import time
 import cv2
-from vgg19 import extract_features, compare_features
-import sqlite_operations as database
-from map_files import image_list as get_image_list
+import database.sqlite as database
+from utils.map_files import image_list as get_image_list
 from itertools import combinations
-from easyocr_custom import OCRPredictor 
-from inception3_custom import predict as inception3_predictor
-from resnet50_custom import predict as resnet50_predictor
-from detectron2_custom import PanopticPredictor
+from models.cv.vgg19 import extract_features, compare_features
+from models.cv.ocr import OCRPredictor
+from models.cv.inception3 import predict as inception3_predictor
+from models.cv.resnet50 import predict as resnet50_predictor
+from models.cv.panoptic import PanopticPredictor
 import torch
 from torch.cuda.amp import GradScaler, autocast
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:32'
-import gc
 
 DISTANCE_THRESHOLD = 0.25
 LANGS_TO_COMPARE = ['pt', 'en', 'es', 'de', 'it', 'ru', 'zh', 'fr']
 
 start_time = time.time()
+
 
 def load_image(img_path: str):
     try:
@@ -69,19 +70,29 @@ with autocast():
         for image in images:
             file_path = f'{lang_path}/{image}'
             img = load_image(file_path)
-            
-            features = extract_features(img)
-            ocr_texts = ocr_predictor.predict(img)
-            inception_classes = inception3_predictor(img)
-            resnet_classes = resnet50_predictor(img)
-            panoptic_classes = panoptic_predictor.predict(img)
 
-            db.upsert(file_path, features.tolist(), ocr_texts,
-                    panoptic_classes, inception_classes, resnet_classes)
-            
+            features = extract_features(img)
+            # check if alread exists
+            features_list = features.tolist()
+            feature_history = db.select_by_features(features_list)
+
+            if feature_history is not None:
+                db.upsert(file_path, features_list, feature_history['ocr'], feature_history[
+                          'panoptic'], feature_history['inception_v3'], feature_history['resnet50'])
+                print(
+                    f"Imagem {file_path} já existe uma identica no banco de dados.")
+            else:
+                ocr_texts = ocr_predictor.predict(img)
+                inception_classes = inception3_predictor(img)
+                resnet_classes = resnet50_predictor(img)
+                panoptic_classes = panoptic_predictor.predict(img)
+
+                db.upsert(file_path, features_list, ocr_texts,
+                          panoptic_classes, inception_classes, resnet_classes)
+
             gc.collect()
             torch.cuda.empty_cache()
-    
+
 
 list_to_compare = []
 seen = set()
@@ -97,4 +108,5 @@ for (lang_path1, img_path1), (lang_path2, img_path2) in combinations(image_list,
 
 end_time = time.time()
 elapsed_time = (end_time - start_time) // 60
-print(f"Total time taken: {elapsed_time} minutes and {(end_time - start_time) % 60:.2f} seconds")
+print(
+    f"Total time taken: {elapsed_time} minutes and {(end_time - start_time) % 60:.2f} seconds")
