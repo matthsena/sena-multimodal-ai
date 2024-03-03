@@ -1,12 +1,11 @@
 import gc
 import os
-import sys
 import time
 import cv2
 import database.sqlite as database
 from utils.map_files import image_list as get_image_list
 from itertools import combinations
-from models.cv.vgg19 import extract_features, compare_features
+from models.cv.vgg19 import FeatureExtractor
 from models.cv.ocr import OCRPredictor
 from models.cv.inception3 import predict as inception3_predictor
 from models.cv.resnet50 import predict as resnet50_predictor
@@ -38,14 +37,14 @@ def load_image(img_path: str):
 
 def image_distances(img1, img2):
     try:
-        features_img1 = extract_features(img1)
-        features_img2 = extract_features(img2)
+        features_img1 = vgg19.extract_features(img1)
+        features_img2 = vgg19.extract_features(img2)
 
         if features_img1 is None or features_img2 is None:
             print("Erro ao extrair características das imagens.")
             return None
 
-        distance = compare_features(features_img1, features_img2)
+        distance = vgg19.compare_features(features_img1, features_img2)
 
         if distance is None:
             print("Erro ao comparar características das imagens.")
@@ -63,6 +62,7 @@ image_list = list(filter(lambda x: x is not None, image_list))
 db = database.SQLiteOperations()
 ocr_predictor = OCRPredictor()
 panoptic_predictor = PanopticPredictor()
+vgg19 = FeatureExtractor()
 
 scaler = GradScaler()
 with autocast():
@@ -71,8 +71,8 @@ with autocast():
             file_path = f'{lang_path}/{image}'
             img = load_image(file_path)
 
-            features = extract_features(img)
-            # check if alread exists
+            features = vgg19.extract_features(img)
+            
             features_list = features.tolist()
             feature_history = db.select_by_features(features_list)
 

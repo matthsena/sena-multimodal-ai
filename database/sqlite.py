@@ -5,7 +5,7 @@ import json
 
 class SQLiteOperations:
     def __init__(self):
-        self.conn = sqlite3.connect('data.db')
+        self.conn = sqlite3.connect('./database/data.db')
         self.cursor = self.conn.cursor()
         self.cursor.execute('''
         CREATE TABLE IF NOT EXISTS image_params (
