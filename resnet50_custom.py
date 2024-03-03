@@ -1,3 +1,4 @@
+import cv2
 from torchvision import models, transforms
 import torch.nn.functional as F
 from PIL import Image
@@ -24,6 +25,9 @@ def decode_predictions(preds, top=3):
 
 
 def predict(image):
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = Image.fromarray(image)
+
     transform = transforms.Compose([
         transforms.Resize(224),
         transforms.CenterCrop(224),

@@ -1,26 +1,16 @@
-import easyocr
-import torch
-import cv2
-
-isGpuAvailable = torch.cuda.is_available()
+from paddleocr import PaddleOCR
 
 
-def predict(image):
-  try:
-    reader = easyocr.Reader(
-      ['en', 'pt', 'es', 'fr', 'de', 'it'], gpu=isGpuAvailable)
-    result = reader.readtext(image)
-    valuesAndProb = []
+class OCRPredictor:
+    def __init__(self):
+        self.model = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=True, det_algorithm='DB',
+                               rec_algorithm='SVTR_LCNet', det_db_score_mode='fast', label_list=['0', '90', '180', '270'])
 
-    for (bbox, text, prob) in result:
-      (tl, _, br, _) = bbox
-      tl = (int(tl[0]), int(tl[1]))
-      br = (int(br[0]), int(br[1]))
-      cv2.rectangle(image, tl, br, (0, 255, 0), 2)
-      cv2.putText(image, text, (tl[0], tl[1] - 10),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-      valuesAndProb.append((text, prob))
-    return image, valuesAndProb
-  except Exception as e:
-    print(f"An error occurred in OCR fn: {str(e)}")
-    return None, None
+    def predict(self, image):
+        try:
+            result = self.model.ocr(image, cls=True)
+            filtered_values_and_prob = [item for _, item in result if item[1] >= 0.5]
+            return filtered_values_and_prob
+        except Exception as e:
+            print(f"An error occurred in OCR fn: {str(e)}")
+            return None

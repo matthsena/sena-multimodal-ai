@@ -1,65 +1,49 @@
-import sys
-import os
+from collections import Counter
+import torch
+from transformers import DetrFeatureExtractor, DetrForSegmentation, logging
+import json
+from torch.amp import autocast
 
-sys.path.insert(0, os.path.abspath('./detectron2'))
+logging.set_verbosity_error()
 
-from detectron2.data import MetadataCatalog
-from detectron2.utils.visualizer import Visualizer
-from detectron2.config import get_cfg
-from detectron2.engine import DefaultPredictor
-from detectron2 import model_zoo
+class PanopticPredictor:
+    def __init__(self):
+        self.feature_extractor = DetrFeatureExtractor.from_pretrained(
+            "facebook/detr-resnet-50-panoptic")
+        self.model = DetrForSegmentation.from_pretrained(
+            "facebook/detr-resnet-50-panoptic", ignore_mismatched_sizes=True)
+        with open('coco_2017_cat.json') as f:
+            self.coco_classes = json.load(f)
 
+    def predict(self, image):
+        try:
+            with torch.no_grad():
+                with autocast('cuda'):
+                    inputs = self.feature_extractor(
+                        images=image, return_tensors="pt")
+                    outputs = self.model(**inputs)
+                    processed_sizes = torch.as_tensor(
+                        inputs["pixel_values"].shape[-2:]).unsqueeze(0)
+                    result = self.feature_extractor.post_process_panoptic(
+                        outputs, processed_sizes)[0]
 
-# DETECTRON 2
-def panoptic_predictor(image):
-  try:
-    cfg = get_cfg()
-    cfg.merge_from_file(model_zoo.get_config_file(
-      "COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml"))
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(
-      "COCO-PanopticSegmentation/panoptic_fpn_R_101_3x.yaml")
-    predictor = DefaultPredictor(cfg)
-    panoptic_seg, segments_info = predictor(image)["panoptic_seg"]
-    v = Visualizer(image[:, :, ::-1],
-             MetadataCatalog.get(cfg.DATASETS.TRAIN[0]), scale=1.2)
-    out = v.draw_panoptic_seg_predictions(
-      panoptic_seg.to("cpu"), segments_info)
+            extracted_classes = []
 
-    dset_meta = MetadataCatalog.get("coco_2017_train")
-    dset_meta_stuffs = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
-
-    extracted_classes = []
-
-    for info in segments_info:
-      if info["isthing"] == True:
-        if info["score"] < 0.5:
-          return
-        cat = dset_meta.thing_classes[info['category_id']]
-        extracted_classes.append(cat)
-      else:
-        cat = dset_meta_stuffs.stuff_classes[info['category_id']]
-        extracted_classes.append(cat)
-    return out.get_image()[:, :, ::-1], extracted_classes
-  except Exception as e:
-    print(f"An error occurred on panoptic_predictor: {e}")
-    return None, None
-
-
-def keypoint_predictor(image):
-  try:
-    cfg = get_cfg()
-    cfg.merge_from_file(model_zoo.get_config_file(
-      "COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml"))
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5
-    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(
-      "COCO-Keypoints/keypoint_rcnn_R_101_FPN_3x.yaml")
-    predictor = DefaultPredictor(cfg)
-    keypoint_seg = predictor(image)
-    v = Visualizer(image[:, :, ::-1],
-             MetadataCatalog.get(cfg.DATASETS.TRAIN[0]), scale=1.2)
-    out = v.draw_instance_predictions(keypoint_seg["instances"].to("cpu"))
-    return out.get_image()[:, :, ::-1]
-  except Exception as e:
-    print(f"An error occurred on keypoint_predictor: {e}")
-    return None
+            for info in result['segments_info']:
+                if info["isthing"] == True:
+                    cat_id = self.coco_classes['things_ids'][str(
+                        info['category_id'])]
+                    cat = self.coco_classes['things'][cat_id]
+                    if cat is not None:
+                        extracted_classes.append(cat)
+                else:
+                    stuff_id = self.coco_classes['stuffs_ids'][str(
+                        info['category_id'])]
+                    stuff = self.coco_classes['stuffs'][stuff_id]
+                    if stuff is not None:
+                        extracted_classes.append(stuff)
+            counts = Counter(extracted_classes)
+            return [(key, value) for key, value in counts.items()]
+        except Exception as e:
+            print(f"An error occurred on panoptic_predictor: {e}")
+            return None
