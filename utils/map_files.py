@@ -30,4 +30,4 @@ def image_list(lang_path: str):
             print(f"Erro: {folder_path} não é um diretório.")
             continue
 
-        return (folder_path, sorted(file_list))
+        return (lang_path, folder_path, sorted(file_list))

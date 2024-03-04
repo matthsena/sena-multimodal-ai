@@ -1,6 +1,9 @@
 import sqlite3
 from sqlite3 import Error
 import json
+import sys
+
+import numpy as np
 
 
 class SQLiteOperations:
@@ -10,6 +13,8 @@ class SQLiteOperations:
         self.cursor.execute('''
         CREATE TABLE IF NOT EXISTS image_params (
             file_path TEXT PRIMARY KEY,
+            lang TEXT,
+            article TEXT,
             features TEXT,
             ocr TEXT,
             panoptic TEXT,
@@ -21,7 +26,7 @@ class SQLiteOperations:
     def __del__(self):
         self.conn.close()
 
-    def insert(self, file_path, features, ocr, panoptic, inception_v3, resnet50):
+    def insert(self, lang, file_path, features, ocr, panoptic, inception_v3, resnet50):
         try:
             features = json.dumps(features)
             ocr = json.dumps(ocr)
@@ -29,9 +34,9 @@ class SQLiteOperations:
             inception_v3 = json.dumps(inception_v3)
             resnet50 = json.dumps(resnet50)
             self.cursor.execute('''
-            INSERT INTO image_params (file_path, features, ocr, panoptic, inception_v3, resnet50)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ''', (file_path, features, ocr, panoptic, inception_v3, resnet50))
+            INSERT INTO image_params (file_path, lang, article, features, ocr, panoptic, inception_v3, resnet50)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (file_path, lang, sys.argv[1], features, ocr, panoptic, inception_v3, resnet50))
             self.conn.commit()
         except Error as e:
             print(f"Error in insert: {e}")
@@ -45,17 +50,20 @@ class SQLiteOperations:
             if row is not None:
                 return {
                     'file_path': row[0],
-                    'features': json.loads(row[1]),
-                    'ocr': json.loads(row[2]),
-                    'panoptic': json.loads(row[3]),
-                    'inception_v3': json.loads(row[4]),
-                    'resnet50': json.loads(row[5])
+                    'lang': row[1],
+                    'article': row[2],
+                    'features': json.loads(row[3]),
+                    'ocr': json.loads(row[4]),
+                    'panoptic': json.loads(row[5]),
+                    'inception_v3': json.loads(row[6]),
+                    'resnet50': json.loads(row[7])
                 }
             else:
                 return None
         except Exception as e:
             print(f"Erro ao selecionar dados: {e}")
             return None
+        
     def select_by_features(self, features):
         try:
             features = json.dumps(features)
@@ -66,18 +74,36 @@ class SQLiteOperations:
             if row is not None:
                 return {
                     'file_path': row[0],
-                    'features': json.loads(row[1]),
-                    'ocr': json.loads(row[2]),
-                    'panoptic': json.loads(row[3]),
-                    'inception_v3': json.loads(row[4]),
-                    'resnet50': json.loads(row[5])
+                    'lang': row[1],
+                    'article': row[2],
+                    'features': json.loads(row[3]),
+                    'ocr': json.loads(row[4]),
+                    'panoptic': json.loads(row[5]),
+                    'inception_v3': json.loads(row[6]),
+                    'resnet50': json.loads(row[7])
                 }
             else:
                 return None
         except Exception as e:
             print(f"Erro ao selecionar dados: {e}")
             return None
-    def upsert(self, file_path, features, ocr, panoptic, inception_v3, resnet50):
+    
+    def select_feature_by_file_path(self, file_path):
+        try:
+            self.cursor.execute('''
+        SELECT features FROM image_params WHERE file_path = ?
+        ''', (file_path,))
+            row = self.cursor.fetchone()
+            if row is not None:
+                # Convert the list back to a numpy array
+                return np.array(json.loads(row[0]))
+            else:
+                return None
+        except Exception as e:
+            print(f"Erro ao selecionar dados: {e}")
+            return None
+
+    def upsert(self, file_path, lang, features, ocr, panoptic, inception_v3, resnet50):
         try:
             features = json.dumps(features)
             ocr = json.dumps(ocr)
@@ -91,9 +117,9 @@ class SQLiteOperations:
         try:
             self.cursor.execute('''
             INSERT OR REPLACE INTO image_params
-            (file_path, features, ocr, panoptic, inception_v3, resnet50)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ''', (file_path, features, ocr, panoptic, inception_v3, resnet50))
+            (file_path, lang, article, features, ocr, panoptic, inception_v3, resnet50)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (file_path, lang, sys.argv[1], features, ocr, panoptic, inception_v3, resnet50))
             self.conn.commit()
         except sqlite3.IntegrityError as e:
             print(f"Erro de integridade do SQLite: {e}")
@@ -102,107 +128,4 @@ class SQLiteOperations:
         except Exception as e:
             print(f"Erro desconhecido: {e}")
 
-    def upsert_features(self, file_path, features):
-        try:
-            features = json.dumps(features)
-        except TypeError as e:
-            print(f"Erro ao converter as características para JSON: {e}")
-            return
-
-        try:
-            self.cursor.execute('''
-            INSERT OR REPLACE INTO image_params
-            (file_path, features)
-            VALUES (?, ?)
-            ''', (file_path, features))
-            self.conn.commit()
-        except sqlite3.IntegrityError as e:
-            print(f"Erro de integridade do SQLite: {e}")
-        except sqlite3.ProgrammingError as e:
-            print(f"Erro de programação do SQLite: {e}")
-        except Exception as e:
-            print(f"Erro desconhecido: {e}")
-
-    def upsert_ocr(self, file_path, ocr):
-        try:
-            ocr = json.dumps(ocr)
-        except TypeError as e:
-            print(f"Erro ao converter o OCR para JSON: {e}")
-            return
-
-        try:
-            self.cursor.execute('''
-            INSERT OR REPLACE INTO image_params
-            (file_path, ocr)
-            VALUES (?, ?)
-            ''', (file_path, ocr))
-            self.conn.commit()
-        except sqlite3.IntegrityError as e:
-            print(f"Erro de integridade do SQLite: {e}")
-        except sqlite3.ProgrammingError as e:
-            print(f"Erro de programação do SQLite: {e}")
-        except Exception as e:
-            print(f"Erro desconhecido: {e}")
-
-    def upsert_panoptic(self, file_path, panoptic):
-        try:
-            panoptic = json.dumps(panoptic)
-        except TypeError as e:
-            print(f"Erro ao converter o panoptic para JSON: {e}")
-            return
-
-        try:
-            self.cursor.execute('''
-            INSERT OR REPLACE INTO image_params
-            (file_path, panoptic)
-            VALUES (?, ?)
-            ''', (file_path, panoptic))
-            self.conn.commit()
-        except sqlite3.IntegrityError as e:
-            print(f"Erro de integridade do SQLite: {e}")
-        except sqlite3.ProgrammingError as e:
-            print(f"Erro de programação do SQLite: {e}")
-        except Exception as e:
-            print(f"Erro desconhecido: {e}")
-
-    def upsert_inception_v3(self, file_path, inception_v3):
-        try:
-            inception_v3 = json.dumps(inception_v3)
-        except TypeError as e:
-            print(f"Erro ao converter o inception_v3 para JSON: {e}")
-            return
-
-        try:
-            self.cursor.execute('''
-            INSERT OR REPLACE INTO image_params
-            (file_path, inception_v3)
-            VALUES (?, ?)
-            ''', (file_path, inception_v3))
-            self.conn.commit()
-        except sqlite3.IntegrityError as e:
-            print(f"Erro de integridade do SQLite: {e}")
-        except sqlite3.ProgrammingError as e:
-            print(f"Erro de programação do SQLite: {e}")
-        except Exception as e:
-            print(f"Erro desconhecido: {e}")
-
-    def upsert_resnet50(self, file_path, resnet50):
-        try:
-            resnet50 = json.dumps(resnet50)
-        except TypeError as e:
-            print(f"Erro ao converter o resnet50 para JSON: {e}")
-            return
-
-        try:
-            self.cursor.execute('''
-            INSERT OR REPLACE INTO image_params
-            (file_path, resnet50)
-            VALUES (?, ?)
-            ''', (file_path, resnet50))
-            self.conn.commit()
-        except sqlite3.IntegrityError as e:
-            print(f"Erro de integridade do SQLite: {e}")
-        except sqlite3.ProgrammingError as e:
-            print(f"Erro de programação do SQLite: {e}")
-        except Exception as e:
-            print(f"Erro desconhecido: {e}")
+    
