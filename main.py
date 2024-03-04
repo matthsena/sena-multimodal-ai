@@ -12,8 +12,10 @@ from models.cv.resnet50 import predict as resnet50_predictor
 from models.cv.panoptic import PanopticPredictor
 import torch
 from torch.cuda.amp import GradScaler, autocast
+from concurrent.futures import ThreadPoolExecutor
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:32'
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 DISTANCE_THRESHOLD = 0.25
 LANGS_TO_COMPARE = ['pt', 'en', 'es', 'de', 'it', 'ru', 'zh', 'fr']
@@ -82,10 +84,16 @@ with autocast():
                 print(
                     f"Imagem {file_path} já existe uma identica no banco de dados.")
             else:
-                ocr_texts = ocr_predictor.predict(img)
-                inception_classes = inception3_predictor(img)
-                resnet_classes = resnet50_predictor(img)
-                panoptic_classes = panoptic_predictor.predict(img)
+                with ThreadPoolExecutor() as executor:
+                    ocr_texts_future = executor.submit(ocr_predictor.predict, img)
+                    inception_classes_future = executor.submit(inception3_predictor, img)
+                    resnet_classes_future = executor.submit(resnet50_predictor, img)
+                    panoptic_classes_future = executor.submit(panoptic_predictor.predict, img)
+                
+                ocr_texts = ocr_texts_future.result()
+                inception_classes = inception_classes_future.result()
+                resnet_classes = resnet_classes_future.result()
+                panoptic_classes = panoptic_classes_future.result()
 
                 db.upsert(file_path, features_list, ocr_texts,
                           panoptic_classes, inception_classes, resnet_classes)

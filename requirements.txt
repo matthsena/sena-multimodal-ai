@@ -31,10 +31,10 @@ transformers
 accelerate
 langchain-openai
 keras
-tensorflow[and-cuda]
-tensorflow
+# tensorflow[and-cuda]
+# tensorflow
 Numpy==1.23.5
 paddlepaddle-gpu
-paddlepaddle
+# paddlepaddle
 paddleocr>=2.0.1
 PyMuPDF==1.21.1
